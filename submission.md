@@ -1,5 +1,13 @@
 # Mixtape Bug Hunt Submission
 
+## AI Usage
+
+- I used AI tooling primarily for codebase navigation and explanation, not blind bug diagnosis.
+- During orientation, I used AI to trace route-to-service call chains and summarize what each service function was responsible for.
+- During debugging, I used AI to compare similar code paths (for example, working notification flow versus missing notification flow) and to flag likely edge-case conditions to inspect.
+- I verified all AI-assisted conclusions by directly reading the referenced files/functions and running tests before committing any fix.
+- In places where AI guidance was broad, I narrowed scope by reproducing behavior with project tests and then validating the exact line-level root cause myself.
+
 ## Codebase Map
 
 - `app.py`: Flask app factory (`create_app`), SQLAlchemy initialization, and blueprint registration.
@@ -86,11 +94,3 @@
 - **Root Cause:** `get_playlist_songs()` returned `[song.to_dict() for song in songs[:-1]]`, which always sliced off the last result.
 - **Fix and Side-Effect Check:** Returned full result list (`songs`) without slicing. Side-effect checks: verified ordering remained position-ascending and empty playlists still returned `[]` via `pytest tests/test_playlists.py`.
 - **Commit:** `be28132` — `fix: include final playlist entry in song retrieval`
-
-## AI Assistance Disclosure
-
-- AI tooling was used for navigation and understanding:
-	- Mapping route-to-service call chains.
-	- Summarizing how service functions interacted with models.
-	- Speeding up codebase orientation before implementation.
-- Final diagnosis was confirmed through direct code reading and test execution before fixes were committed.
