@@ -45,6 +45,7 @@
 ### Bug 1: My listening streak keeps resetting
 
 - **Issue/Symptom:** Consecutive listening across Saturday -> Sunday reset streak instead of incrementing.
+- **How Reproduced (before fix):** In `tests/test_streaks.py`, ran the Saturday/Sunday path (`test_streak_increments_on_sunday`) using `pytest tests/test_streaks.py`. Input state: `last_listened_at` on Saturday UTC, then call `update_listening_streak` on Sunday UTC.
 - **Root Cause:** `update_listening_streak()` had a hard-coded `today.weekday() != 6` guard that blocked Sunday increments even when `days_since_last == 1`.
 - **Fix Implemented:** Removed the Sunday-specific condition and incremented streak for any consecutive day.
 - **Verification:** Ran `pytest tests/test_streaks.py`; Sunday coverage test now passes.
@@ -61,6 +62,7 @@
 ### Bug 3: The same song keeps showing up twice in search
 
 - **Issue/Symptom:** Search returned duplicate songs when matched songs had multiple tags.
+- **How Reproduced (before fix):** Ran `pytest tests/test_search.py` and targeted the multi-tag condition (`test_search_no_duplicates_multi_tag_song`). Trigger condition: a matching song with multiple rows in `song_tags` from the outer join path.
 - **Root Cause:** Query outer-joined `song_tags`, producing one row per matching tag; results were returned directly without deduplication.
 - **Fix Implemented:** Added `.distinct()` to the song query before `.all()`.
 - **Verification:** Ran `pytest tests/test_search.py`; multi-tag duplicate test now passes.
@@ -77,6 +79,7 @@
 ### Bug 5: The last song in a playlist never shows up
 
 - **Issue/Symptom:** Playlist song list omitted final track.
+- **How Reproduced (before fix):** Ran `pytest tests/test_playlists.py` and used a seeded 5-song playlist from fixture data (`test_playlist_returns_all_songs`). Trigger condition: retrieval path in `get_playlist_songs` always slicing the final element.
 - **Root Cause:** `get_playlist_songs()` returned `[song.to_dict() for song in songs[:-1]]`, which always sliced off the last result.
 - **Fix Implemented:** Returned full result list (`songs`) without slicing.
 - **Verification:** Ran `pytest tests/test_playlists.py`; all playlist count/order tests pass.
