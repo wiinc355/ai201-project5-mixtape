@@ -46,43 +46,45 @@
 
 - **Issue/Symptom:** Consecutive listening across Saturday -> Sunday reset streak instead of incrementing.
 - **How Reproduced (before fix):** In `tests/test_streaks.py`, ran the Saturday/Sunday path (`test_streak_increments_on_sunday`) using `pytest tests/test_streaks.py`. Input state: `last_listened_at` on Saturday UTC, then call `update_listening_streak` on Sunday UTC.
+- **How I Found the Root Cause:** Navigation path: `README.md` issue list -> `routes/songs.py` (`POST /<song_id>/listen`) -> `services/streak_service.py` (`record_listening_event` -> `update_listening_streak`). In `update_listening_streak`, the consecutive-day branch had an extra `today.weekday() != 6` condition, which directly explained why Sunday consecutive listens failed.
 - **Root Cause:** `update_listening_streak()` had a hard-coded `today.weekday() != 6` guard that blocked Sunday increments even when `days_since_last == 1`.
-- **Fix Implemented:** Removed the Sunday-specific condition and incremented streak for any consecutive day.
-- **Verification:** Ran `pytest tests/test_streaks.py`; Sunday coverage test now passes.
+- **Fix and Side-Effect Check:** Removed the Sunday-specific condition and incremented streak for any consecutive day. Side-effect checks: confirmed same-day listens still do not double-count and skipped-day behavior still resets via `pytest tests/test_streaks.py`.
 - **Commit:** `62f46cc` — `fix: allow streak increments on Sunday transitions`
 
 ### Bug 2: Friends Listening Now shows people from yesterday
 
 - **Issue/Symptom:** Listening-now feed included events from yesterday if they were within the last 24 hours.
+- **How Reproduced (before fix):** Triggered feed logic with one friend event from yesterday evening and one from today morning. Yesterday event still appeared in listening-now because it was inside a rolling 24-hour window.
+- **How I Found the Root Cause:** Navigation path: `README.md` issue list -> `routes/feed.py` (`/<user_id>/listening-now`) -> `services/feed_service.py` (`get_friends_listening_now`). The key moment was seeing `cutoff = datetime.now(timezone.utc) - timedelta(hours=24)`, which encodes recency-by-hours, not calendar-day “now”.
 - **Root Cause:** `get_friends_listening_now()` used a rolling 24-hour window (`timedelta(hours=24)`) instead of a calendar-day boundary expected by product behavior.
-- **Fix Implemented:** Replaced rolling threshold with start-of-current-UTC-day cutoff (`00:00:00` UTC).
-- **Verification:** Ran full test suite (`pytest tests`); no regressions. Manual logic check confirms yesterday entries are excluded.
+- **Fix and Side-Effect Check:** Replaced rolling threshold with start-of-current-UTC-day cutoff (`00:00:00` UTC). Side-effect checks: retained ordering and per-friend deduplication behavior, then ran `pytest tests` to ensure no regressions in adjacent features.
 - **Commit:** `5fe7bde` — `fix: limit listening-now feed to today's events`
 
 ### Bug 3: The same song keeps showing up twice in search
 
 - **Issue/Symptom:** Search returned duplicate songs when matched songs had multiple tags.
 - **How Reproduced (before fix):** Ran `pytest tests/test_search.py` and targeted the multi-tag condition (`test_search_no_duplicates_multi_tag_song`). Trigger condition: a matching song with multiple rows in `song_tags` from the outer join path.
+- **How I Found the Root Cause:** Navigation path: `README.md` issue list -> `routes/songs.py` (`/search`) -> `services/search_service.py` (`search_songs`). I checked query composition and confirmed it outer-joined `song_tags` but returned raw `Song` rows without deduplication, matching the duplicate-on-multi-tag symptom exactly.
 - **Root Cause:** Query outer-joined `song_tags`, producing one row per matching tag; results were returned directly without deduplication.
-- **Fix Implemented:** Added `.distinct()` to the song query before `.all()`.
-- **Verification:** Ran `pytest tests/test_search.py`; multi-tag duplicate test now passes.
+- **Fix and Side-Effect Check:** Added `.distinct()` to the song query before `.all()`. Side-effect checks: ensured no-tag and single-tag songs still return once and that no-match queries still return empty via `pytest tests/test_search.py`.
 - **Commit:** `84e8f10` — `fix: deduplicate song rows in tag-joined search`
 
 ### Bug 4: Missing notification when a friend rated my song
 
 - **Issue/Symptom:** Song owner received playlist-add notifications but not rating notifications.
+- **How Reproduced (before fix):** Compared side effects of adding to playlist vs rating the same shared song. Playlist action created a notification for the owner; rating action only stored rating data and produced no notification.
+- **How I Found the Root Cause:** Navigation path: `README.md` issue list -> `routes/playlists.py` and `routes/songs.py` -> `services/notification_service.py`. Line-by-line comparison of `add_to_playlist()` and `rate_song()` showed only playlist flow called `create_notification` for owner interactions.
 - **Root Cause:** `rate_song()` persisted rating changes but never triggered notification creation for the song owner.
-- **Fix Implemented:** Added notification creation after rating commit when rater is not the song owner.
-- **Verification:** Ran full test suite (`pytest tests`) to confirm no regressions; route/service flow now includes notification side effect.
+- **Fix and Side-Effect Check:** Added notification creation after rating commit when rater is not the song owner. Side-effect checks: preserved score validation and upsert behavior for existing ratings, and prevented self-notification for owner self-ratings.
 - **Commit:** `7052601` — `fix: notify song owner when friend rates shared song`
 
 ### Bug 5: The last song in a playlist never shows up
 
 - **Issue/Symptom:** Playlist song list omitted final track.
 - **How Reproduced (before fix):** Ran `pytest tests/test_playlists.py` and used a seeded 5-song playlist from fixture data (`test_playlist_returns_all_songs`). Trigger condition: retrieval path in `get_playlist_songs` always slicing the final element.
+- **How I Found the Root Cause:** Navigation path: `README.md` issue list -> `routes/playlists.py` (`/<playlist_id>/songs`) -> `services/playlist_service.py` (`get_playlist_songs`). In the return statement, `songs[:-1]` directly explained why one item was always dropped.
 - **Root Cause:** `get_playlist_songs()` returned `[song.to_dict() for song in songs[:-1]]`, which always sliced off the last result.
-- **Fix Implemented:** Returned full result list (`songs`) without slicing.
-- **Verification:** Ran `pytest tests/test_playlists.py`; all playlist count/order tests pass.
+- **Fix and Side-Effect Check:** Returned full result list (`songs`) without slicing. Side-effect checks: verified ordering remained position-ascending and empty playlists still returned `[]` via `pytest tests/test_playlists.py`.
 - **Commit:** `be28132` — `fix: include final playlist entry in song retrieval`
 
 ## AI Assistance Disclosure
