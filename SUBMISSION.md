@@ -24,6 +24,15 @@
 3. `rate_song()` validates user/song/score, upserts a `Rating` row, commits, and conditionally creates a `Notification` for the song owner.
 4. The route returns `rating.to_dict()` as JSON.
 
+## Bug Reproduction Notes
+
+- I reproduced each issue before patching by running the focused tests tied to that service area:
+	- `pytest tests/test_streaks.py`
+	- `pytest tests/test_search.py`
+	- `pytest tests/test_playlists.py`
+- For issue #2 and issue #4 (not covered by provided tests), I reproduced by tracing the route -> service call chain and validating behavior against service logic before implementing changes.
+- After each fix, I reran relevant tests and then executed `pytest tests` as a regression check.
+
 ## Root Cause Analysis Entries
 
 ### Bug 1: My listening streak keeps resetting
@@ -65,3 +74,11 @@
 - **Fix Implemented:** Returned full result list (`songs`) without slicing.
 - **Verification:** Ran `pytest tests/test_playlists.py`; all playlist count/order tests pass.
 - **Commit:** `be28132` — `fix: include final playlist entry in song retrieval`
+
+## AI Assistance Disclosure
+
+- AI tooling was used for navigation and understanding:
+	- Mapping route-to-service call chains.
+	- Summarizing how service functions interacted with models.
+	- Speeding up codebase orientation before implementation.
+- Final diagnosis was confirmed through direct code reading and test execution before fixes were committed.
