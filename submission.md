@@ -33,6 +33,13 @@
 - For issue #2 and issue #4 (not covered by provided tests), I reproduced by tracing the route -> service call chain and validating behavior against service logic before implementing changes.
 - After each fix, I reran relevant tests and then executed `pytest tests` as a regression check.
 
+## Initial Triage Plan (First Three Issues)
+
+- First: Issue #1 (`services/streak_service.py`) because it has focused tests and a user-facing correctness bug in core streak logic.
+- Second: Issue #3 (`services/search_service.py`) because duplicate search rows are easy to reproduce and isolate at query level.
+- Third: Issue #5 (`services/playlist_service.py`) because the last-song omission is deterministic and covered by playlist tests.
+- Follow-up after the first three: address Issue #2 and Issue #4, then rerun full regression tests.
+
 ## Root Cause Analysis Entries
 
 ### Bug 1: My listening streak keeps resetting
